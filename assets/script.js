@@ -8,11 +8,22 @@
   const HALF_W = TILE_W / 2;
   const HALF_H = TILE_H / 2;
 
-  // Player state in tile coordinates
+  // Player state in tile coordinates (grid-locked)
   const player = {
+    // Render position (may be between tiles while animating)
     i: 0,
     j: 0,
-    speed: 4, // tiles per second
+    // Discrete grid position (centers)
+    gridI: 0,
+    gridJ: 0,
+    // Movement tween
+    startI: 0,
+    startJ: 0,
+    destI: 0,
+    destJ: 0,
+    t: 0,             // 0..1 progress
+    moving: false,
+    speed: 7,         // tiles per second
     emoji: '🧭',
     emojiSize: 38
   };
@@ -20,6 +31,7 @@
   const cam = { x: 0, y: 0 };
 
   const keys = new Set();
+  let lastKey = null;
 
   function iso(i, j) {
     return {
@@ -37,14 +49,22 @@
 
   function setupInput() {
     window.addEventListener('keydown', (e) => {
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
+        keys.add(e.key);
+        lastKey = e.key;
       }
-      if (e.key.startsWith('Arrow')) keys.add(e.key);
     });
 
     window.addEventListener('keyup', (e) => {
-      if (e.key.startsWith('Arrow')) keys.delete(e.key);
+      if (e.key.startsWith('Arrow')) {
+        keys.delete(e.key);
+        if (e.key === lastKey) {
+          // Choose any remaining pressed key as lastKey, else null
+          const order = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+          lastKey = order.find(k => keys.has(k)) || null;
+        }
+      }
     });
   }
 
@@ -60,19 +80,60 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  function update(dt) {
-    // Movement mapped to screen cardinal directions
-    // Up: (i--, j--), Down: (i++, j++), Left: (i--, j++), Right: (i++, j--)
-    let di = 0, dj = 0;
-    if (keys.has('ArrowUp'))    { di -= 1; dj -= 1; }
-    if (keys.has('ArrowDown'))  { di += 1; dj += 1; }
-    if (keys.has('ArrowLeft'))  { di -= 1; dj += 1; }
-    if (keys.has('ArrowRight')) { di += 1; dj -= 1; }
+  function chooseDirection() {
+    // Prefer the most recent key if still held, otherwise a fixed priority
+    let key = lastKey && keys.has(lastKey) ? lastKey : null;
+    if (!key) {
+      const order = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+      key = order.find(k => keys.has(k)) || null;
+    }
+    if (!key) return null;
 
-    if (di !== 0 || dj !== 0) {
-      const len = Math.hypot(di, dj);
-      player.i += (di / len) * player.speed * dt;
-      player.j += (dj / len) * player.speed * dt;
+    switch (key) {
+      case 'ArrowUp': return { di: -1, dj: -1 };
+      case 'ArrowDown': return { di: 1, dj: 1 };
+      case 'ArrowLeft': return { di: -1, dj: 1 };
+      case 'ArrowRight': return { di: 1, dj: -1 };
+      default: return null;
+    }
+  }
+
+  function startStep(di, dj) {
+    if (player.moving) return;
+    player.startI = player.gridI;
+    player.startJ = player.gridJ;
+    player.destI = player.gridI + di;
+    player.destJ = player.gridJ + dj;
+    player.t = 0;
+    player.moving = true;
+  }
+
+  function update(dt) {
+    // Start a new step if idle and a direction is requested
+    if (!player.moving) {
+      const dir = chooseDirection();
+      if (dir) startStep(dir.di, dir.dj);
+    }
+
+    // Progress ongoing step
+    if (player.moving) {
+      player.t += player.speed * dt; // tiles per second
+      const t = Math.min(1, player.t);
+      player.i = player.startI + (player.destI - player.startI) * t;
+      player.j = player.startJ + (player.destJ - player.startJ) * t;
+
+      if (t >= 1) {
+        player.moving = false;
+        player.gridI = player.destI;
+        player.gridJ = player.destJ;
+        // Snap exactly to center
+        player.i = player.gridI;
+        player.j = player.gridJ;
+      }
+    } else {
+      // Ensure exact snapping when idle (just in case)
+      player.i = player.gridI;
+      player.j = player.gridJ;
     }
 
     // Camera deadzone (a centered rectangle on the screen)
@@ -142,9 +203,9 @@
         const cx = c.x - cam.x + w / 2;
         const cy = c.y - cam.y + h / 2;
 
-        const topX = cx,          topY = cy - HALF_H;
+        const topX = cx,            topY = cy - HALF_H;
         const rightX = cx + HALF_W, rightY = cy;
-        const bottomX = cx,       bottomY = cy + HALF_H;
+        const bottomX = cx,         bottomY = cy + HALF_H;
         const leftX = cx - HALF_W,  leftY = cy;
 
         // Quick reject offscreen
@@ -193,6 +254,11 @@
   function init() {
     setupInput();
     resize();
+
+    // Ensure initial snap to grid center
+    player.i = player.gridI;
+    player.j = player.gridJ;
+
     const startP = iso(player.i, player.j);
     cam.x = startP.x;
     cam.y = startP.y;
