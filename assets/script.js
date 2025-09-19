@@ -10,6 +10,16 @@
   const SPRITE_Y_OFFSET = 4;   // Player/emoji vertical offset (moved a bit up)
   const GROUND_Y_OFFSET = 12;  // Ground tiles offset (moved a few pixels down)
 
+  // Character sprite sheet config
+  const CHAR_SPRITE_W = 32;     // each frame width in px
+  const CHAR_SPRITE_H = 27;     // each frame height in px
+  const CHAR_SPRITE_COLS = 12;  // frames per row
+  const CHAR_IDLE_FRAME = 4;    // 5th sprite is idle (0-indexed)
+  const CHAR_SCALE = 2;         // scale sprite to fit tiles
+  const CHAR_ANIM_FPS = 12;     // walking animation speed
+  const CHAR_FEET_OFFSET = 6;   // small extra offset so feet sit nicely on tile
+  const CHAR_X_OFFSET = 12;     // horizontal visual offset to correct sheet alignment
+
   // Player state in tile coordinates (grid-locked steps with easing)
   const player = {
     // Animated position
@@ -26,6 +36,15 @@
     t: 0,               // 0..1 progress
     moving: false,
     speed: 8,           // tiles per second
+
+    // Facing direction for directional sprite sheets
+    dir: 'bottom_left',
+
+    // Animation
+    frame: CHAR_IDLE_FRAME,
+    animTimer: 0,
+
+    // Fallback emoji while assets load (not used once sprites are ready)
     emoji: '🧭',
     emojiSize: 30
   };
@@ -50,6 +69,15 @@
 
   function lerp(a, b, t) { return a + (b - a) * t; }
   function easeInOutSine(t) { return 0.5 - 0.5 * Math.cos(Math.PI * t); }
+
+  // Map step delta to facing sheet name
+  function facingFromDelta(di, dj) {
+    if (di === 0 && dj === 1) return 'bottom_left';   // Down/S
+    if (di === 1 && dj === 0) return 'bottom_right';  // Right/D
+    if (di === 0 && dj === -1) return 'top_right';    // Up/W
+    if (di === -1 && dj === 0) return 'top_left';     // Left/A
+    return player.dir;
+  }
 
   function setupInput() {
     window.addEventListener('keydown', (e) => {
@@ -84,6 +112,9 @@
     player.destI = player.gridI + di;
     player.destJ = player.gridJ + dj;
     player.t = 0;
+
+    // Update facing for the new step
+    player.dir = facingFromDelta(di, dj);
   }
 
   // Resize handling with HiDPI support
@@ -149,6 +180,19 @@
 
     if (onScreenY < dzTop)    cam.y = p.y + h / 2 - dzTop;
     else if (onScreenY > dzBottom) cam.y = p.y + h / 2 - dzBottom;
+
+    // Advance walk animation when moving; show idle when not
+    if (player.moving) {
+      player.animTimer += dt;
+      const step = 1 / CHAR_ANIM_FPS;
+      while (player.animTimer >= step) {
+        player.animTimer -= step;
+        player.frame = (player.frame + 1) % CHAR_SPRITE_COLS;
+      }
+    } else {
+      player.frame = CHAR_IDLE_FRAME;
+      player.animTimer = 0;
+    }
   }
 
   function drawGrid() {
@@ -255,14 +299,7 @@
           ctx.drawImage(drawGrid._grass, imgX, imgY, TILE_W, TILE_H);
         }
 
-        // Optional outline to keep the grid readable
-        ctx.beginPath();
-        ctx.moveTo(leftX, leftY);
-        ctx.lineTo(topX, topY);
-        ctx.lineTo(rightX, rightY);
-        ctx.lineTo(bottomX, bottomY);
-        ctx.closePath();
-        ctx.stroke();
+        
       }
     }
   }
@@ -274,19 +311,85 @@
     const x = p.x - cam.x + w / 2;
     const y = p.y - cam.y + h / 2 + SPRITE_Y_OFFSET;
 
+    // Lazy-load character sprite sheets for 4 facings once
+    if (!drawPlayer._init) {
+      drawPlayer._sprites = {};
+      drawPlayer._ready = {};
+      function load(name, src) {
+        const img = new Image();
+        drawPlayer._ready[name] = false;
+        img.onload = () => {
+          drawPlayer._sprites[name] = img;
+          drawPlayer._ready[name] = true;
+        };
+        img.src = src;
+        drawPlayer._sprites[name] = img;
+      }
+      load('bottom_left',  'assets/images/character/character_bottom_left.png');
+      load('bottom_right', 'assets/images/character/character_bottom_right.png');
+      load('top_left',     'assets/images/character/character_top_left.png');
+      load('top_right',    'assets/images/character/character_top_right.png');
+      drawPlayer._init = true;
+    }
+
     // Soft shadow
     ctx.fillStyle = 'rgba(0,0,0,0.12)';
     ctx.beginPath();
     ctx.ellipse(x, y + HALF_H * 0.2, HALF_W * 0.35, HALF_H * 0.25, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Emoji sprite
-    ctx.font = `${player.emojiSize}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillStyle = '#111';
-    // Slight vertical offset so emoji appears standing on the tile center
-    ctx.fillText(player.emoji, x, y + 6);
+    // Choose sprite sheet by facing; fallback to bottom_left if available; else emoji
+    const facing = player.dir;
+    const hasSprites = !!drawPlayer._sprites;
+    const ready = hasSprites ? drawPlayer._ready : null;
+    let spriteImg = null;
+    let usedFacing = facing;
+    if (hasSprites && ready) {
+      if (ready[facing]) {
+        spriteImg = drawPlayer._sprites[facing];
+      } else if (ready.bottom_left) {
+        spriteImg = drawPlayer._sprites.bottom_left;
+        usedFacing = 'bottom_left';
+      }
+    }
+
+    if (spriteImg) {
+      const frame = player.frame;
+      const sx = (frame % CHAR_SPRITE_COLS) * CHAR_SPRITE_W;
+      const sy = 0;
+      const sw = CHAR_SPRITE_W;
+      const sh = CHAR_SPRITE_H;
+
+      const dw = sw * CHAR_SCALE;
+      const dh = sh * CHAR_SCALE;
+      let dx = x - dw / 2 + CHAR_X_OFFSET;
+      let dy = y - dh + CHAR_FEET_OFFSET; // small feet offset so they sit on the tile
+
+      // Per-facing fine alignment (in source pixels)
+      if (!drawPlayer._off) {
+        drawPlayer._off = {
+          bottom_left:  { x: 0, y: 0 },
+          bottom_right: { x: 1, y: 0 }, // fix: bottom_right sheet shifted left by 1px
+          top_left:     { x: 0, y: 0 },
+          top_right:    { x: 0, y: 0 }
+        };
+      }
+      const o = drawPlayer._off[usedFacing] || drawPlayer._off.bottom_left;
+      dx += o.x * CHAR_SCALE;
+      dy += o.y * CHAR_SCALE;
+
+      const prevSmoothing = ctx.imageSmoothingEnabled;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(spriteImg, sx, sy, sw, sh, dx, dy, dw, dh);
+      ctx.imageSmoothingEnabled = prevSmoothing;
+    } else {
+      // Fallback emoji while images load
+      ctx.font = `${player.emojiSize}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = '#111';
+      ctx.fillText(player.emoji, x, y + 6);
+    }
   }
 
   function render() {
