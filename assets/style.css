@@ -60,3 +60,43 @@ footer {
   }
 
 }
+
+/* Game canvas fills the viewport */
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #f8fafc; /* keep subtle light bg behind grid */
+  z-index: 0;
+  touch-action: none;
+}
+
+/* Small HUD overlay for instructions */
+.hud {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  background: rgba(255,255,255,0.85);
+  color: #222;
+  padding: 10px 12px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  z-index: 1;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+
+.hud h1 {
+  margin: 0 0 4px 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.hud p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #444;
+}
