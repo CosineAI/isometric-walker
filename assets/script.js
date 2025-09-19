@@ -343,11 +343,13 @@
     const hasSprites = !!drawPlayer._sprites;
     const ready = hasSprites ? drawPlayer._ready : null;
     let spriteImg = null;
+    let usedFacing = facing;
     if (hasSprites && ready) {
       if (ready[facing]) {
         spriteImg = drawPlayer._sprites[facing];
       } else if (ready.bottom_left) {
         spriteImg = drawPlayer._sprites.bottom_left;
+        usedFacing = 'bottom_left';
       }
     }
 
@@ -360,11 +362,24 @@
 
       const dw = sw * CHAR_SCALE;
       const dh = sh * CHAR_SCALE;
-      const dx = x - dw / 2 + CHAR_X_OFFSET;
-      const dy = y - dh + CHAR_FEET_OFFSET; // small feet offset so they sit on the tile
+      let dx = x - dw / 2 + CHAR_X_OFFSET;
+      let dy = y - dh + CHAR_FEET_OFFSET; // small feet offset so they sit on the tile
+
+      // Per-facing fine alignment (in source pixels)
+      if (!drawPlayer._off) {
+        drawPlayer._off = {
+          bottom_left:  { x: 0, y: 0 },
+          bottom_right: { x: 1, y: 0 }, // fix: bottom_right sheet shifted left by 1px
+          top_left:     { x: 0, y: 0 },
+          top_right:    { x: 0, y: 0 }
+        };
+      }
+      const o = drawPlayer._off[usedFacing] || drawPlayer._off.bottom_left;
+      dx += o.x * CHAR_SCALE;
+      dy += o.y * CHAR_SCALE;
 
       const prevSmoothing = ctx.imageSmoothingEnabled;
-      ctx.imageSmoothingEnabled = false; // crisp pixel art
+      ctx.imageSmoothingEnabled = false;
       ctx.drawImage(spriteImg, sx, sy, sw, sh, dx, dy, dw, dh);
       ctx.imageSmoothingEnabled = prevSmoothing;
     } else {
