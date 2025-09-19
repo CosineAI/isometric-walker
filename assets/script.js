@@ -36,6 +36,9 @@
     moving: false,
     speed: 8,           // tiles per second
 
+    // Facing direction for directional sprite sheets
+    dir: 'bottom_left',
+
     // Animation
     frame: CHAR_IDLE_FRAME,
     animTimer: 0,
@@ -65,6 +68,15 @@
 
   function lerp(a, b, t) { return a + (b - a) * t; }
   function easeInOutSine(t) { return 0.5 - 0.5 * Math.cos(Math.PI * t); }
+
+  // Map step delta to facing sheet name
+  function facingFromDelta(di, dj) {
+    if (di === 0 && dj === 1) return 'bottom_left';   // Down/S
+    if (di === 1 && dj === 0) return 'bottom_right';  // Right/D
+    if (di === 0 && dj === -1) return 'top_right';    // Up/W
+    if (di === -1 && dj === 0) return 'top_left';     // Left/A
+    return player.dir;
+  }
 
   function setupInput() {
     window.addEventListener('keydown', (e) => {
@@ -99,6 +111,9 @@
     player.destI = player.gridI + di;
     player.destJ = player.gridJ + dj;
     player.t = 0;
+
+    // Update facing for the new step
+    player.dir = facingFromDelta(di, dj);
   }
 
   // Resize handling with HiDPI support
@@ -302,16 +317,24 @@
     const x = p.x - cam.x + w / 2;
     const y = p.y - cam.y + h / 2 + SPRITE_Y_OFFSET;
 
-    // Lazy-load character sprite sheet once (bottom-left facing for now)
+    // Lazy-load character sprite sheets for 4 facings once
     if (!drawPlayer._init) {
-      const img = new Image();
-      drawPlayer._spriteReady = false;
-      img.onload = () => {
-        drawPlayer._sprite = img;
-        drawPlayer._spriteReady = true;
-      };
-      img.src = 'assets/images/character/character_bottom_left.png';
-      drawPlayer._sprite = img;
+      drawPlayer._sprites = {};
+      drawPlayer._ready = {};
+      function load(name, src) {
+        const img = new Image();
+        drawPlayer._ready[name] = false;
+        img.onload = () => {
+          drawPlayer._sprites[name] = img;
+          drawPlayer._ready[name] = true;
+        };
+        img.src = src;
+        drawPlayer._sprites[name] = img;
+      }
+      load('bottom_left',  'assets/images/character/character_bottom_left.png');
+      load('bottom_right', 'assets/images/character/character_bottom_right.png');
+      load('top_left',     'assets/images/character/character_top_left.png');
+      load('top_right',    'assets/images/character/character_top_right.png');
       drawPlayer._init = true;
     }
 
@@ -321,8 +344,20 @@
     ctx.ellipse(x, y + HALF_H * 0.2, HALF_W * 0.35, HALF_H * 0.25, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Draw character sprite when ready, fall back to emoji while loading
-    if (drawPlayer._spriteReady) {
+    // Choose sprite sheet by facing; fallback to bottom_left if available; else emoji
+    const facing = player.dir;
+    const hasSprites = !!drawPlayer._sprites;
+    const ready = hasSprites ? drawPlayer._ready : null;
+    let spriteImg = null;
+    if (hasSprites && ready) {
+      if (ready[facing]) {
+        spriteImg = drawPlayer._sprites[facing];
+      } else if (ready.bottom_left) {
+        spriteImg = drawPlayer._sprites.bottom_left;
+      }
+    }
+
+    if (spriteImg) {
       const frame = player.frame;
       const sx = (frame % CHAR_SPRITE_COLS) * CHAR_SPRITE_W;
       const sy = 0;
@@ -332,14 +367,14 @@
       const dw = sw * CHAR_SCALE;
       const dh = sh * CHAR_SCALE;
       const dx = x - dw / 2;
-      const dy = y - dh + CHAR_FEET_OFFSET; // small feet offset so they sit on the tile
+      const dy = y - dh + CHAR_FEET_OFFSET;
 
       const prevSmoothing = ctx.imageSmoothingEnabled;
-      ctx.imageSmoothingEnabled = false; // crisp pixel art
-      ctx.drawImage(drawPlayer._sprite, sx, sy, sw, sh, dx, dy, dw, dh);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(spriteImg, sx, sy, sw, sh, dx, dy, dw, dh);
       ctx.imageSmoothingEnabled = prevSmoothing;
     } else {
-      // Fallback emoji while image loads
+      // Fallback emoji while images load
       ctx.font = `${player.emojiSize}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'alphabetic';
