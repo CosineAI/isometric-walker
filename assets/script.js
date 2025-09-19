@@ -23,7 +23,6 @@
     destJ: 0,
     t: 0,               // 0..1 progress
     moving: false,
-    dir: { di: 0, dj: 0 },
     speed: 8,           // tiles per second
     emoji: '🧭',
     emojiSize: 38
@@ -31,9 +30,8 @@
 
   const cam = { x: 0, y: 0 };
 
-  const keys = new Set();
-  let lastKey = null;          // last pressed arrow for tie-breaking
-  let bufferedDir = null;      // one-step buffer of desired next direction
+  // Tap queue: one move per discrete key press (no auto-repeat)
+  const tapQueue = [];
 
   function iso(i, j) {
     return {
@@ -55,48 +53,24 @@
     window.addEventListener('keydown', (e) => {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
-        keys.add(e.key);
-        lastKey = e.key;
-      }
-    });
-    window.addEventListener('keyup', (e) => {
-      if (e.key.startsWith('Arrow')) {
-        keys.delete(e.key);
-        if (lastKey === e.key) {
-          // pick another currently held key, if any
-          const order = ['ArrowUp', 'ArrowDown', 'ArrowRight', 'ArrowLeft'];
-          lastKey = order.find(k => keys.has(k)) || null;
+        if (e.repeat) return; // tap mode: ignore auto-repeats
+
+        // Isometric mapping on tap:
+        // Up: top-right, Down: bottom-left, Right: bottom-right, Left: top-left
+        let dir = null;
+        switch (e.key) {
+          case 'ArrowUp':    dir = { di: 0,  dj: -1 }; break;
+          case 'ArrowDown':  dir = { di: 0,  dj:  1 }; break;
+          case 'ArrowRight': dir = { di: 1,  dj:  0 }; break;
+          case 'ArrowLeft':  dir = { di: -1, dj:  0 }; break;
         }
+        if (dir) tapQueue.push(dir);
       }
     });
-  }
-
-  // Prefer the most recent key still held, otherwise a consistent order
-  function chooseDirection() {
-    let key = lastKey && keys.has(lastKey) ? lastKey : null;
-    if (!key) {
-      const order = ['ArrowUp', 'ArrowDown', 'ArrowRight', 'ArrowLeft'];
-      key = order.find(k => keys.has(k)) || null;
-    }
-    if (!key) return null;
-
-    // Isometric mapping:
-    // Up:    top-right      => (di=0,  dj=-1)
-    // Down:  bottom-left    => (di=0,  dj=+1)
-    // Right: bottom-right   => (di=+1, dj=0)
-    // Left:  top-left       => (di=-1, dj=0)
-    switch (key) {
-      case 'ArrowUp':    return { di: 0,  dj: -1 };
-      case 'ArrowDown':  return { di: 0,  dj:  1 };
-      case 'ArrowRight': return { di: 1,  dj:  0 };
-      case 'ArrowLeft':  return { di: -1, dj:  0 };
-      default: return null;
-    }
   }
 
   function startStep(di, dj) {
     player.moving = true;
-    player.dir = { di, dj };
     player.startI = player.gridI;
     player.startJ = player.gridJ;
     player.destI = player.gridI + di;
@@ -117,26 +91,13 @@
   }
 
   function update(dt) {
-    // If idle, begin moving in desired direction immediately
+    // Start a step from tap queue if idle
     if (!player.moving) {
-      const dir = chooseDirection();
-      if (dir) startStep(dir.di, dir.dj);
-    } else {
-      // Buffer the next desired direction while moving
-      const desired = chooseDirection();
-      if (desired) {
-        // Always keep the latest requested direction as buffer
-        bufferedDir = desired;
-      } else if (
-        bufferedDir &&
-        player.dir &&
-        bufferedDir.di === player.dir.di &&
-        bufferedDir.dj === player.dir.dj
-      ) {
-        // If no key is pressed, clear a same-direction buffer to avoid accidental double-steps
-        bufferedDir = null;
+      if (tapQueue.length > 0) {
+        const dir = tapQueue.shift();
+        startStep(dir.di, dir.dj);
       }
-
+    } else {
       // Progress current step
       player.t += player.speed * dt; // tiles per second
       const t = Math.min(1, player.t);
@@ -152,10 +113,9 @@
         player.j = player.gridJ;
         player.moving = false;
 
-        // Immediately chain the next step if input requests it
-        const next = chooseDirection() || bufferedDir;
-        if (next) {
-          bufferedDir = null; // consume buffer
+        // Chain next queued tap immediately
+        if (tapQueue.length > 0) {
+          const next = tapQueue.shift();
           startStep(next.di, next.dj);
         }
       }
