@@ -7,7 +7,8 @@
   const TILE_H = 48;
   const HALF_W = TILE_W / 2;
   const HALF_H = TILE_H / 2;
-  const SPRITE_Y_OFFSET = 8;
+  const SPRITE_Y_OFFSET = 8;   // Player/emoji vertical offset
+  const GROUND_Y_OFFSET = 12;  // Ground tiles offset (moved a few pixels down)
 
   // Player state in tile coordinates (grid-locked steps with easing)
   const player = {
@@ -238,9 +239,9 @@
           continue;
         }
 
-        // Draw tile sprite centered on the tile, using the same vertical offset as grass
+        // Draw tile sprite centered on the tile, using a slightly lower vertical offset for ground
         const imgX = cx - HALF_W;
-        const imgY = cy - HALF_H + SPRITE_Y_OFFSET;
+        const imgY = cy - HALF_H + GROUND_Y_OFFSET;
 
         const useDirt = isDirt(i, j);
         if (useDirt && drawGrid._dirtReady) {
