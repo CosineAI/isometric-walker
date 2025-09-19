@@ -154,16 +154,28 @@
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
 
-    // Lazy-load grass tile sprite once
+    // Lazy-load grass and dirt tile sprites once
     if (!drawGrid._init) {
-      const img = new Image();
-      drawGrid._ready = false;
-      img.onload = () => {
-        drawGrid._img = img;
-        drawGrid._ready = true;
+      // grass
+      const grass = new Image();
+      drawGrid._grassReady = false;
+      grass.onload = () => {
+        drawGrid._grass = grass;
+        drawGrid._grassReady = true;
       };
-      img.src = 'assets/images/grass.png';
-      drawGrid._img = img;
+      grass.src = 'assets/images/grass.png';
+      drawGrid._grass = grass;
+
+      // dirt
+      const dirt = new Image();
+      drawGrid._dirtReady = false;
+      dirt.onload = () => {
+        drawGrid._dirt = dirt;
+        drawGrid._dirtReady = true;
+      };
+      dirt.src = 'assets/images/dirt.png';
+      drawGrid._dirt = dirt;
+
       drawGrid._init = true;
     }
 
@@ -202,6 +214,14 @@
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(30, 41, 59, 0.18)';
 
+    // Deterministic tile variant picker (sprinkles of dirt)
+    function isDirt(i, j) {
+      // Simple 2D hash
+      const v = Math.abs((i * 73856093) ^ (j * 19349663));
+      // ~1 in 8 tiles become dirt
+      return (v % 8) === 0;
+    }
+
     for (let i = iMin; i <= iMax; i++) {
       for (let j = jMin; j <= jMax; j++) {
         const c = iso(i, j);
@@ -218,11 +238,15 @@
           continue;
         }
 
-        // Draw grass tile sprite centered on the tile
-        if (drawGrid._ready) {
-          const imgX = cx - HALF_W;
-          const imgY = cy - HALF_H + SPRITE_Y_OFFSET;
-          ctx.drawImage(drawGrid._img, imgX, imgY, TILE_W, TILE_H);
+        // Draw tile sprite centered on the tile, using the same vertical offset as grass
+        const imgX = cx - HALF_W;
+        const imgY = cy - HALF_H + SPRITE_Y_OFFSET;
+
+        const useDirt = isDirt(i, j);
+        if (useDirt && drawGrid._dirtReady) {
+          ctx.drawImage(drawGrid._dirt, imgX, imgY, TILE_W, TILE_H);
+        } else if (!useDirt && drawGrid._grassReady) {
+          ctx.drawImage(drawGrid._grass, imgX, imgY, TILE_W, TILE_H);
         }
 
         // Optional outline to keep the grid readable
