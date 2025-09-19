@@ -51,18 +51,24 @@
 
   function setupInput() {
     window.addEventListener('keydown', (e) => {
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      const k = e.key.toLowerCase();
+      // Accept arrows and WASD in tap mode (ignore auto-repeat)
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(k)) {
         e.preventDefault();
         if (e.repeat) return; // tap mode: ignore auto-repeats
 
         // Isometric mapping on tap:
-        // Up: top-right, Down: bottom-left, Right: bottom-right, Left: top-left
+        // Up/W: top-right, Down/S: bottom-left, Right/D: bottom-right, Left/A: top-left
         let dir = null;
-        switch (e.key) {
-          case 'ArrowUp':    dir = { di: 0,  dj: -1 }; break;
-          case 'ArrowDown':  dir = { di: 0,  dj:  1 }; break;
-          case 'ArrowRight': dir = { di: 1,  dj:  0 }; break;
-          case 'ArrowLeft':  dir = { di: -1, dj:  0 }; break;
+        switch (k) {
+          case 'arrowup':
+          case 'w': dir = { di: 0,  dj: -1 }; break;
+          case 'arrowdown':
+          case 's': dir = { di: 0,  dj:  1 }; break;
+          case 'arrowright':
+          case 'd': dir = { di: 1,  dj:  0 }; break;
+          case 'arrowleft':
+          case 'a': dir = { di: -1, dj:  0 }; break;
         }
         if (dir) tapQueue.push(dir);
       }
