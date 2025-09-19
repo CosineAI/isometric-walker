@@ -3,8 +3,8 @@
   const ctx = canvas.getContext('2d');
 
   // Tile dimensions (diamond width/height)
-  const TILE_W = 128;
-  const TILE_H = 64;
+  const TILE_W = 96;
+  const TILE_H = 48;
   const HALF_W = TILE_W / 2;
   const HALF_H = TILE_H / 2;
 
@@ -25,7 +25,7 @@
     moving: false,
     speed: 8,           // tiles per second
     emoji: '🧭',
-    emojiSize: 38
+    emojiSize: 30
   };
 
   const cam = { x: 0, y: 0 };
