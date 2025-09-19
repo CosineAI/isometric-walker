@@ -19,6 +19,19 @@
 
   const cam = { x: 0, y: 0 };
 
+  // Visual snap (emoji) easing towards nearest tile center
+  const snap = {
+    i: 0,
+    j: 0,
+    startI: 0,
+    startJ: 0,
+    targetI: 0,
+    targetJ: 0,
+    t: 1,
+    duration: 0.12,
+    speed: 12 // tiles per second used to derive duration
+  };
+
   const keys = new Set();
 
   function iso(i, j) {
@@ -29,11 +42,13 @@
   }
 
   function isoToTile(x, y) {
-    // Inverse of the above transform (returns fractional tile coords)
     const i = (y / HALF_H + x / HALF_W) / 2;
     const j = (y / HALF_H - x / HALF_W) / 2;
     return { i, j };
   }
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function easeInOutSine(t) { return 0.5 - 0.5 * Math.cos(Math.PI * t); }
 
   function setupInput() {
     window.addEventListener('keydown', (e) => {
@@ -77,6 +92,28 @@
       player.j += (dj / len) * player.speed * dt;
     }
 
+    // Update visual snap target and ease progress
+    const ti = Math.round(player.i);
+    const tj = Math.round(player.j);
+    if (ti !== snap.targetI || tj !== snap.targetJ) {
+      snap.startI = snap.i;
+      snap.startJ = snap.j;
+      snap.targetI = ti;
+      snap.targetJ = tj;
+      const dist = Math.hypot(snap.targetI - snap.startI, snap.targetJ - snap.startJ);
+      snap.duration = Math.max(0.08, Math.min(0.25, dist / snap.speed));
+      snap.t = 0;
+    }
+    if (snap.t < 1) {
+      snap.t = Math.min(1, snap.t + (dt / snap.duration));
+      const u = easeInOutSine(snap.t);
+      snap.i = lerp(snap.startI, snap.targetI, u);
+      snap.j = lerp(snap.startJ, snap.targetJ, u);
+    } else {
+      snap.i = snap.targetI;
+      snap.j = snap.targetJ;
+    }
+
     // Camera deadzone (a centered rectangle on the screen)
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
@@ -103,17 +140,14 @@
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
 
-    // Clear
     ctx.clearRect(0, 0, w, h);
 
-    // Subtle background
     const grad = ctx.createLinearGradient(0, 0, 0, h);
     grad.addColorStop(0, '#fbfcfe');
     grad.addColorStop(1, '#edf1f6');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
 
-    // Compute tile range visible using inverse transform of the viewport corners
     const margin = Math.max(TILE_W, TILE_H) * 2;
     const corners = [
       { x: cam.x - w / 2 - margin, y: cam.y - h / 2 - margin },
@@ -149,7 +183,6 @@
         const bottomX = cx,         bottomY = cy + HALF_H;
         const leftX = cx - HALF_W,  leftY = cy;
 
-        // Quick reject offscreen
         if (rightX < -TILE_W || leftX > w + TILE_W || bottomY < -TILE_H || topY > h + TILE_H) {
           continue;
         }
@@ -169,26 +202,19 @@
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
 
-    // Snap the rendered position to the nearest tile center
-    const si = Math.round(player.i);
-    const sj = Math.round(player.j);
-    const p = iso(si, sj);
-
+    const p = iso(snap.i, snap.j);
     const x = p.x - cam.x + w / 2;
     const y = p.y - cam.y + h / 2;
 
-    // Soft shadow
     ctx.fillStyle = 'rgba(0,0,0,0.12)';
     ctx.beginPath();
     ctx.ellipse(x, y + HALF_H * 0.2, HALF_W * 0.35, HALF_H * 0.25, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Emoji sprite
     ctx.font = `${player.emojiSize}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = '#111';
-    // Slight vertical offset so emoji appears standing on the tile center
     ctx.fillText(player.emoji, x, y + 6);
   }
 
@@ -201,13 +227,22 @@
     setupInput();
     resize();
 
+    // Initialize snap to nearest center
+    snap.i = Math.round(player.i);
+    snap.j = Math.round(player.j);
+    snap.startI = snap.i;
+    snap.startJ = snap.j;
+    snap.targetI = snap.i;
+    snap.targetJ = snap.j;
+    snap.t = 1;
+
     const startP = iso(player.i, player.j);
     cam.x = startP.x;
     cam.y = startP.y;
 
     let last = performance.now();
     function tick(now) {
-      const dt = Math.min(0.05, (now - last) / 1000); // clamp big jumps
+      const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       update(dt);
       render();
