@@ -7,6 +7,7 @@
   const TILE_H = 48;
   const HALF_W = TILE_W / 2;
   const HALF_H = TILE_H / 2;
+  const SPRITE_Y_OFFSET = 8;
 
   // Player state in tile coordinates (grid-locked steps with easing)
   const player = {
@@ -220,7 +221,7 @@
         // Draw grass tile sprite centered on the tile
         if (drawGrid._ready) {
           const imgX = cx - HALF_W;
-          const imgY = cy - HALF_H;
+          const imgY = cy - HALF_H + SPRITE_Y_OFFSET;
           ctx.drawImage(drawGrid._img, imgX, imgY, TILE_W, TILE_H);
         }
 
@@ -241,7 +242,7 @@
     const h = canvas.clientHeight;
     const p = iso(player.i, player.j);
     const x = p.x - cam.x + w / 2;
-    const y = p.y - cam.y + h / 2;
+    const y = p.y - cam.y + h / 2 + SPRITE_Y_OFFSET;
 
     // Soft shadow
     ctx.fillStyle = 'rgba(0,0,0,0.12)';
