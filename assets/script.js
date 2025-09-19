@@ -124,7 +124,18 @@
     } else {
       // Buffer the next desired direction while moving
       const desired = chooseDirection();
-      if (desired) bufferedDir = desired;
+      if (desired) {
+        // Always keep the latest requested direction as buffer
+        bufferedDir = desired;
+      } else if (
+        bufferedDir &&
+        player.dir &&
+        bufferedDir.di === player.dir.di &&
+        bufferedDir.dj === player.dir.dj
+      ) {
+        // If no key is pressed, clear a same-direction buffer to avoid accidental double-steps
+        bufferedDir = null;
+      }
 
       // Progress current step
       player.t += player.speed * dt; // tiles per second
