@@ -18,6 +18,7 @@
   const CHAR_SCALE = 2;         // scale sprite to fit tiles
   const CHAR_ANIM_FPS = 12;     // walking animation speed
   const CHAR_FEET_OFFSET = 6;   // small extra offset so feet sit nicely on tile
+  const CHAR_X_OFFSET = 12;     // horizontal visual offset to correct sheet alignment
 
   // Player state in tile coordinates (grid-locked steps with easing)
   const player = {
@@ -366,11 +367,11 @@
 
       const dw = sw * CHAR_SCALE;
       const dh = sh * CHAR_SCALE;
-      const dx = x - dw / 2;
-      const dy = y - dh + CHAR_FEET_OFFSET;
+      const dx = x - dw / 2 + CHAR_X_OFFSET;
+      const dy = y - dh + CHAR_FEET_OFFSET; // small feet offset so they sit on the tile
 
       const prevSmoothing = ctx.imageSmoothingEnabled;
-      ctx.imageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = false; // crisp pixel art
       ctx.drawImage(spriteImg, sx, sy, sw, sh, dx, dy, dw, dh);
       ctx.imageSmoothingEnabled = prevSmoothing;
     } else {
