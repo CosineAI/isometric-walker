@@ -7,7 +7,8 @@
   const TILE_H = 48;
   const HALF_W = TILE_W / 2;
   const HALF_H = TILE_H / 2;
-  const SPRITE_Y_OFFSET = 8;
+  const SPRITE_Y_OFFSET = 4;   // Player/emoji vertical offset (moved a bit up)
+  const GROUND_Y_OFFSET = 12;  // Ground tiles offset (moved a few pixels down)
 
   // Player state in tile coordinates (grid-locked steps with easing)
   const player = {
@@ -154,16 +155,28 @@
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
 
-    // Lazy-load grass tile sprite once
+    // Lazy-load grass and dirt tile sprites once
     if (!drawGrid._init) {
-      const img = new Image();
-      drawGrid._ready = false;
-      img.onload = () => {
-        drawGrid._img = img;
-        drawGrid._ready = true;
+      // grass
+      const grass = new Image();
+      drawGrid._grassReady = false;
+      grass.onload = () => {
+        drawGrid._grass = grass;
+        drawGrid._grassReady = true;
       };
-      img.src = 'assets/images/grass.png';
-      drawGrid._img = img;
+      grass.src = 'assets/images/grass.png';
+      drawGrid._grass = grass;
+
+      // dirt
+      const dirt = new Image();
+      drawGrid._dirtReady = false;
+      dirt.onload = () => {
+        drawGrid._dirt = dirt;
+        drawGrid._dirtReady = true;
+      };
+      dirt.src = 'assets/images/dirt.png';
+      drawGrid._dirt = dirt;
+
       drawGrid._init = true;
     }
 
@@ -202,6 +215,19 @@
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(30, 41, 59, 0.18)';
 
+    // Deterministic pseudo-random per-tile selection favoring grass
+    function tileRand(i, j) {
+      // 2D integer hash -> [0,1)
+      let x = i * 374761393 + j * 668265263;
+      x = (x ^ (x >> 13)) >>> 0;
+      x = (x * 1274126177) >>> 0;
+      return (x >>> 0) / 4294967296;
+    }
+    const DIRT_PROB = 0.2; // 20% dirt, 80% grass
+    function isDirt(i, j) {
+      return tileRand(i, j) < DIRT_PROB;
+    }
+
     for (let i = iMin; i <= iMax; i++) {
       for (let j = jMin; j <= jMax; j++) {
         const c = iso(i, j);
@@ -218,11 +244,15 @@
           continue;
         }
 
-        // Draw grass tile sprite centered on the tile
-        if (drawGrid._ready) {
-          const imgX = cx - HALF_W;
-          const imgY = cy - HALF_H + SPRITE_Y_OFFSET;
-          ctx.drawImage(drawGrid._img, imgX, imgY, TILE_W, TILE_H);
+        // Draw tile sprite centered on the tile, using a slightly lower vertical offset for ground
+        const imgX = cx - HALF_W;
+        const imgY = cy - HALF_H + GROUND_Y_OFFSET;
+
+        const useDirt = isDirt(i, j);
+        if (useDirt && drawGrid._dirtReady) {
+          ctx.drawImage(drawGrid._dirt, imgX, imgY, TILE_W, TILE_H);
+        } else if (!useDirt && drawGrid._grassReady) {
+          ctx.drawImage(drawGrid._grass, imgX, imgY, TILE_W, TILE_H);
         }
 
         // Optional outline to keep the grid readable
