@@ -215,12 +215,17 @@
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(30, 41, 59, 0.18)';
 
-    // Deterministic tile variant picker (sprinkles of dirt)
+    // Deterministic pseudo-random per-tile selection favoring grass
+    function tileRand(i, j) {
+      // 2D integer hash -> [0,1)
+      let x = i * 374761393 + j * 668265263;
+      x = (x ^ (x >> 13)) >>> 0;
+      x = (x * 1274126177) >>> 0;
+      return (x >>> 0) / 4294967296;
+    }
+    const DIRT_PROB = 0.2; // 20% dirt, 80% grass
     function isDirt(i, j) {
-      // Simple 2D hash
-      const v = Math.abs((i * 73856093) ^ (j * 19349663));
-      // ~1 in 8 tiles become dirt
-      return (v % 8) === 0;
+      return tileRand(i, j) < DIRT_PROB;
     }
 
     for (let i = iMin; i <= iMax; i++) {
