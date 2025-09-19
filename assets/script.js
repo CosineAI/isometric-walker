@@ -7,7 +7,7 @@
   const TILE_H = 48;
   const HALF_W = TILE_W / 2;
   const HALF_H = TILE_H / 2;
-  const SPRITE_Y_OFFSET = 8;   // Player/emoji vertical offset
+  const SPRITE_Y_OFFSET = 4;   // Player/emoji vertical offset (moved a bit up)
   const GROUND_Y_OFFSET = 12;  // Ground tiles offset (moved a few pixels down)
 
   // Player state in tile coordinates (grid-locked steps with easing)
