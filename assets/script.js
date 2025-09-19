@@ -153,6 +153,19 @@
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
 
+    // Lazy-load grass tile sprite once
+    if (!drawGrid._init) {
+      const img = new Image();
+      drawGrid._ready = false;
+      img.onload = () => {
+        drawGrid._img = img;
+        drawGrid._ready = true;
+      };
+      img.src = 'assets/images/grass.png';
+      drawGrid._img = img;
+      drawGrid._init = true;
+    }
+
     // Clear
     ctx.clearRect(0, 0, w, h);
 
@@ -204,6 +217,14 @@
           continue;
         }
 
+        // Draw grass tile sprite centered on the tile
+        if (drawGrid._ready) {
+          const imgX = cx - HALF_W;
+          const imgY = cy - HALF_H;
+          ctx.drawImage(drawGrid._img, imgX, imgY, TILE_W, TILE_H);
+        }
+
+        // Optional outline to keep the grid readable
         ctx.beginPath();
         ctx.moveTo(leftX, leftY);
         ctx.lineTo(topX, topY);
