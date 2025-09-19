@@ -168,7 +168,12 @@
   function drawPlayer() {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
-    const p = iso(player.i, player.j);
+
+    // Snap the rendered position to the nearest tile center
+    const si = Math.round(player.i);
+    const sj = Math.round(player.j);
+    const p = iso(si, sj);
+
     const x = p.x - cam.x + w / 2;
     const y = p.y - cam.y + h / 2;
 
