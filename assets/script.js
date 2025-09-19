@@ -299,14 +299,7 @@
           ctx.drawImage(drawGrid._grass, imgX, imgY, TILE_W, TILE_H);
         }
 
-        // Optional outline to keep the grid readable
-        ctx.beginPath();
-        ctx.moveTo(leftX, leftY);
-        ctx.lineTo(topX, topY);
-        ctx.lineTo(rightX, rightY);
-        ctx.lineTo(bottomX, bottomY);
-        ctx.closePath();
-        ctx.stroke();
+        
       }
     }
   }
