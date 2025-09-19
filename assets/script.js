@@ -3,10 +3,11 @@
   const ctx = canvas.getContext('2d');
 
   // Tile dimensions (diamond width/height)
-  const TILE_W = 128;
-  const TILE_H = 64;
+  const TILE_W = 96;
+  const TILE_H = 48;
   const HALF_W = TILE_W / 2;
   const HALF_H = TILE_H / 2;
+  const SPRITE_Y_OFFSET = 8;
 
   // Player state in tile coordinates (grid-locked steps with easing)
   const player = {
@@ -25,7 +26,7 @@
     moving: false,
     speed: 8,           // tiles per second
     emoji: '🧭',
-    emojiSize: 38
+    emojiSize: 30
   };
 
   const cam = { x: 0, y: 0 };
@@ -153,6 +154,19 @@
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
 
+    // Lazy-load grass tile sprite once
+    if (!drawGrid._init) {
+      const img = new Image();
+      drawGrid._ready = false;
+      img.onload = () => {
+        drawGrid._img = img;
+        drawGrid._ready = true;
+      };
+      img.src = 'assets/images/grass.png';
+      drawGrid._img = img;
+      drawGrid._init = true;
+    }
+
     // Clear
     ctx.clearRect(0, 0, w, h);
 
@@ -204,6 +218,14 @@
           continue;
         }
 
+        // Draw grass tile sprite centered on the tile
+        if (drawGrid._ready) {
+          const imgX = cx - HALF_W;
+          const imgY = cy - HALF_H + SPRITE_Y_OFFSET;
+          ctx.drawImage(drawGrid._img, imgX, imgY, TILE_W, TILE_H);
+        }
+
+        // Optional outline to keep the grid readable
         ctx.beginPath();
         ctx.moveTo(leftX, leftY);
         ctx.lineTo(topX, topY);
@@ -220,7 +242,7 @@
     const h = canvas.clientHeight;
     const p = iso(player.i, player.j);
     const x = p.x - cam.x + w / 2;
-    const y = p.y - cam.y + h / 2;
+    const y = p.y - cam.y + h / 2 + SPRITE_Y_OFFSET;
 
     // Soft shadow
     ctx.fillStyle = 'rgba(0,0,0,0.12)';
